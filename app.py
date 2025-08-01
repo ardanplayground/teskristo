@@ -51,8 +51,12 @@ def get_recommendation(pos, harga_rp):
 st.set_page_config(page_title="Prediksi Crypto", layout="centered")
 st.title("🔮 Prediksi Crypto: Beli atau Tidak?")
 
-default_coin = st.session_state.get("selected_coin", "bitcoin")
-coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value=default_coin)
+# Session State Default Coin
+if "selected_coin" not in st.session_state:
+    st.session_state.selected_coin = "bitcoin"
+
+# Input Prediksi
+coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value=st.session_state.selected_coin)
 
 if st.button("Prediksi Sekarang"):
     with st.spinner("Mengambil data..."):
@@ -89,23 +93,28 @@ if st.button("Prediksi Sekarang"):
         else:
             st.error("Gagal mengambil data coin. Pastikan simbol coin valid.")
 
-# --- Fitur Pencarian Coin dari List CoinGecko ---
+# --- Search Daftar Coin ---
 st.markdown("---")
 with st.expander("🔍 Cari Coin dari Database CoinGecko"):
     keyword = st.text_input("Cari coin berdasarkan simbol/nama:")
     if st.button("Cari Coin"):
-        with st.spinner("Mencari..."):
+        with st.spinner("Mengambil daftar coin..."):
             response = requests.get("https://api.coingecko.com/api/v3/coins/list")
             if response.status_code == 200:
                 all_coins = response.json()
-                filtered = [c for c in all_coins if keyword.lower() in c["symbol"].lower() or keyword.lower() in c["name"].lower()]
+                filtered = [
+                    c for c in all_coins 
+                    if keyword.lower() in c["symbol"].lower() or keyword.lower() in c["name"].lower()
+                ]
                 if filtered:
-                    cols = st.columns(len(filtered))
-                    for i, coin_info in enumerate(filtered):
-                        with cols[i % len(cols)]:
-                            if st.button(f"{coin_info['symbol'].upper()} ({coin_info['name']})"):
-                                st.session_state["selected_coin"] = coin_info["id"]
+                    st.write("Klik untuk memilih:")
+                    cols = st.columns(3)
+                    for i, coin_info in enumerate(filtered[:30]):  # Batasi 30 hasil biar gak meledak
+                        with cols[i % 3]:
+                            if st.button(f"{coin_info['symbol'].upper()} ({coin_info['name']})", key=f"select_{coin_info['id']}"):
+                                st.session_state.selected_coin = coin_info["id"]
+                                st.experimental_rerun()
                 else:
-                    st.warning("Coin tidak ditemukan.")
+                    st.warning("Tidak ditemukan coin sesuai kata kunci.")
             else:
-                st.error("Gagal mengambil data coin dari CoinGecko.")
+                st.error("Gagal mengambil data dari CoinGecko.")
