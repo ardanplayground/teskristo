@@ -51,19 +51,6 @@ def get_recommendation(pos, harga_rp):
 st.set_page_config(page_title="Prediksi Crypto", layout="centered")
 st.title("🔮 Prediksi Crypto: Beli atau Tidak?")
 
-# Tombol pop-up list koin
-with st.expander("📋 Lihat Daftar Coin Populer"):
-    daftar_koin = [
-        "bitcoin", "ethereum", "binancecoin", "solana", "ripple", "cardano", "dogecoin",
-        "polkadot", "tron", "avalanche", "litecoin", "stellar", "chainlink", "uniswap"
-    ]
-    search = st.text_input("🔎 Cari coin:")
-    hasil_filter = [coin for coin in daftar_koin if search.lower() in coin.lower()]
-    st.write("Klik salah satu coin di bawah untuk mengisi input:")
-    for coin in hasil_filter:
-        if st.button(coin):
-            st.session_state["selected_coin"] = coin
-
 # Text input default
 default_coin = st.session_state.get("selected_coin", "bitcoin")
 coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value=default_coin)
@@ -104,3 +91,17 @@ if st.button("Prediksi Sekarang"):
                 st.info(sell)
         else:
             st.error("Gagal mengambil data coin. Pastikan simbol coin valid.")
+
+# Tombol pop-up list koin (dipindah ke bawah)
+st.markdown("---")
+with st.expander("📋 Lihat Daftar Coin Populer"):
+    daftar_koin = [
+        "bitcoin", "ethereum", "binancecoin", "solana", "ripple", "cardano", "dogecoin",
+        "polkadot", "tron", "avalanche", "litecoin", "stellar", "chainlink", "uniswap"
+    ]
+    search = st.text_input("🔎 Cari coin:")
+    hasil_filter = [coin for coin in daftar_koin if search.lower() in coin.lower()]
+    st.write("Klik salah satu coin di bawah untuk mengisi input:")
+    for coin in hasil_filter:
+        if st.button(coin):
+            st.session_state["selected_coin"] = coin
