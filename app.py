@@ -6,11 +6,19 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import re
 
-st.set_page_config(page_title="Crypto Chat", page_icon="💰")
+# Untuk mendukung TextBlob di Streamlit Cloud
+import nltk
+nltk.download('brown')
+nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('averaged_perceptron_tagger')
 
+# Config tampilan
+st.set_page_config(page_title="Crypto Chat", page_icon="💰")
 st.title("💬 Crypto Chat AI")
 st.markdown("Masukkan coin (misal: `btc`, `bnb`, `solana`) dan aku bantu prediksi apakah layak dibeli atau tidak!")
 
+# Ambil data coin dari CoinGecko
 def get_coin_data(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
     res = requests.get(url)
@@ -30,6 +38,7 @@ def get_coin_data(coin_id):
         }
     return None
 
+# Ambil berita dari Google News (judul aja)
 def search_news(query):
     headers = {"User-Agent": "Mozilla/5.0"}
     url = f"https://news.google.com/search?q={query}%20cryptocurrency&hl=en"
@@ -39,6 +48,7 @@ def search_news(query):
     headlines = [a.get_text() for a in articles][:5]
     return headlines
 
+# Hitung sentimen headline
 def analyze_sentiment(headlines):
     pos, neg = 0, 0
     for h in headlines:
@@ -52,6 +62,7 @@ def analyze_sentiment(headlines):
     neg_percent = round((neg / total) * 100, 2) if total else 0
     return pos_percent, neg_percent
 
+# Evaluasi coin: layak dibeli atau tidak
 def evaluate(data, pos_percent):
     if data["change_7d"] > 3 and pos_percent > 60:
         return "✅ Layak dibeli"
@@ -60,16 +71,16 @@ def evaluate(data, pos_percent):
     else:
         return "❌ Tidak disarankan beli sekarang"
 
+# Prediksi nilai jual
 def predict_sell_point(data):
-    # Strategi sederhana: jual di harga tertinggi 7 hari terakhir +5%
     est_sell_price = round(data["high"] * 1.05, 2)
-    return f"💰 Disarankan jual saat harga menyentuh sekitar ${est_sell_price}"
+    return f"💰 Disarankan jual saat harga menyentuh sekitar **${est_sell_price}**"
 
-# Session & Chat UI
+# Inisialisasi chat
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Tampilkan riwayat
+# Tampilkan riwayat chat
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -106,4 +117,6 @@ if user_input:
             st.markdown(response)
             st.session_state.messages.append({"role": "assistant", "content": response})
         else:
-            st.error("❌ Coin tidak ditemukan. Coba pakai nama coin seperti `bitcoin`, `solana`, `bnb`.")
+            error_msg = "❌ Coin tidak ditemukan. Coba pakai nama coin seperti `bitcoin`, `solana`, `bnb`."
+            st.markdown(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
