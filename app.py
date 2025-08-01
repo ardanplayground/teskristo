@@ -27,13 +27,13 @@ def get_coin_data(coin_symbol):
         }
     return None
 
-# Sentimen dummy
+# Dummy Sentimen
 def get_sentiment_data(coin_symbol):
     pos = random.randint(0, 100)
     neg = 100 - pos
     return pos, neg
 
-# Rekomendasi berdasarkan sentimen dan harga
+# Rekomendasi beli/jual
 def get_recommendation(pos, harga_rp):
     if isinstance(harga_rp, (int, float)):
         if pos > 60:
@@ -47,15 +47,13 @@ def get_recommendation(pos, harga_rp):
         sell = "N/A"
     return rekom, sell
 
-# -------- Streamlit App -------- #
+# Streamlit Layout
 st.set_page_config(page_title="Prediksi Crypto", layout="centered")
 st.title("🔮 Prediksi Crypto: Beli atau Tidak?")
 
-# Text input default
 default_coin = st.session_state.get("selected_coin", "bitcoin")
 coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value=default_coin)
 
-# Tombol prediksi
 if st.button("Prediksi Sekarang"):
     with st.spinner("Mengambil data..."):
         coin_data = get_coin_data(coin.lower())
@@ -64,7 +62,6 @@ if st.button("Prediksi Sekarang"):
         if coin_data:
             rekom, sell = get_recommendation(pos, coin_data["Harga Sekarang (Rp)"])
 
-            # Format tampilan tabel
             coin_data_display = {}
             for k, v in coin_data.items():
                 if "Rp" in k:
@@ -92,16 +89,23 @@ if st.button("Prediksi Sekarang"):
         else:
             st.error("Gagal mengambil data coin. Pastikan simbol coin valid.")
 
-# Tombol pop-up list koin (dipindah ke bawah)
+# --- Fitur Pencarian Coin dari List CoinGecko ---
 st.markdown("---")
-with st.expander("📋 Lihat Daftar Coin Populer"):
-    daftar_koin = [
-        "bitcoin", "ethereum", "binancecoin", "solana", "ripple", "cardano", "dogecoin",
-        "polkadot", "tron", "avalanche", "litecoin", "stellar", "chainlink", "uniswap"
-    ]
-    search = st.text_input("🔎 Cari coin:")
-    hasil_filter = [coin for coin in daftar_koin if search.lower() in coin.lower()]
-    st.write("Klik salah satu coin di bawah untuk mengisi input:")
-    for coin in hasil_filter:
-        if st.button(coin):
-            st.session_state["selected_coin"] = coin
+with st.expander("🔍 Cari Coin dari Database CoinGecko"):
+    keyword = st.text_input("Cari coin berdasarkan simbol/nama:")
+    if st.button("Cari Coin"):
+        with st.spinner("Mencari..."):
+            response = requests.get("https://api.coingecko.com/api/v3/coins/list")
+            if response.status_code == 200:
+                all_coins = response.json()
+                filtered = [c for c in all_coins if keyword.lower() in c["symbol"].lower() or keyword.lower() in c["name"].lower()]
+                if filtered:
+                    cols = st.columns(len(filtered))
+                    for i, coin_info in enumerate(filtered):
+                        with cols[i % len(cols)]:
+                            if st.button(f"{coin_info['symbol'].upper()} ({coin_info['name']})"):
+                                st.session_state["selected_coin"] = coin_info["id"]
+                else:
+                    st.warning("Coin tidak ditemukan.")
+            else:
+                st.error("Gagal mengambil data coin dari CoinGecko.")
