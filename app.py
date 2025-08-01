@@ -55,7 +55,7 @@ st.title("🔮 Prediksi Crypto: Beli atau Tidak?")
 if "selected_coin" not in st.session_state:
     st.session_state.selected_coin = "bitcoin"
 
-# Input Prediksi
+# Input Prediksi dari Session State
 coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value=st.session_state.selected_coin)
 
 if st.button("Prediksi Sekarang"):
@@ -113,7 +113,7 @@ with st.expander("🔍 Cari Coin dari Database CoinGecko"):
                         with cols[i % 3]:
                             if st.button(f"{coin_info['symbol'].upper()} ({coin_info['name']})", key=f"select_{coin_info['id']}"):
                                 st.session_state.selected_coin = coin_info["id"]
-                                st.experimental_rerun()
+                                st.experimental_rerun()  # <--- Ini bikin input langsung ganti dan muncul
                 else:
                     st.warning("Tidak ditemukan coin sesuai kata kunci.")
             else:
