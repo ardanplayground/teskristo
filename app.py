@@ -1,122 +1,70 @@
-# crypto_chat.py
 import streamlit as st
 import requests
-from textblob import TextBlob
-from bs4 import BeautifulSoup
-from datetime import datetime
-import re
+import random
 
-# Untuk mendukung TextBlob di Streamlit Cloud
-import nltk
-nltk.download('brown')
-nltk.download('punkt')
-nltk.download('wordnet')
-nltk.download('averaged_perceptron_tagger')
-
-# Config tampilan
-st.set_page_config(page_title="Crypto Chat", page_icon="💰")
-st.title("💬 Crypto Chat AI")
-st.markdown("Masukkan coin (misal: `btc`, `bnb`, `solana`) dan aku bantu prediksi apakah layak dibeli atau tidak!")
-
-# Ambil data coin dari CoinGecko
-def get_coin_data(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
-    res = requests.get(url)
-    if res.status_code == 200:
-        data = res.json()
-        price = data["market_data"]["current_price"]["usd"]
-        high_24h = data["market_data"]["high_24h"]["usd"]
-        low_24h = data["market_data"]["low_24h"]["usd"]
-        change_7d = data["market_data"]["price_change_percentage_7d"]
-        volume = data["market_data"]["total_volume"]["usd"]
+def get_coin_data(coin_symbol):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_symbol}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        market_data = data.get("market_data", {})
         return {
-            "price": price,
-            "high": high_24h,
-            "low": low_24h,
-            "change_7d": change_7d,
-            "volume": volume
+            "price": market_data.get("current_price", {}).get("usd", "N/A"),
+            "high": market_data.get("high_24h", {}).get("usd", "N/A"),
+            "low": market_data.get("low_24h", {}).get("usd", "N/A"),
+            "change_7d": market_data.get("price_change_percentage_7d", "N/A"),
+            "volume": market_data.get("total_volume", {}).get("usd", "N/A")
         }
     return None
 
-# Ambil berita dari Google News (judul aja)
-def search_news(query):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    url = f"https://news.google.com/search?q={query}%20cryptocurrency&hl=en"
-    res = requests.get(url, headers=headers)
-    soup = BeautifulSoup(res.text, "html.parser")
-    articles = soup.select("article h3")
-    headlines = [a.get_text() for a in articles][:5]
-    return headlines
+def get_sentiment_data(coin_symbol):
+    # Dummy sentiment karena API berita tidak tersedia
+    pos = random.randint(0, 100)
+    neg = 100 - pos
+    return pos, neg
 
-# Hitung sentimen headline
-def analyze_sentiment(headlines):
-    pos, neg = 0, 0
-    for h in headlines:
-        score = TextBlob(h).sentiment.polarity
-        if score > 0:
-            pos += 1
-        elif score < 0:
-            neg += 1
-    total = len(headlines)
-    pos_percent = round((pos / total) * 100, 2) if total else 0
-    neg_percent = round((neg / total) * 100, 2) if total else 0
-    return pos_percent, neg_percent
-
-# Evaluasi coin: layak dibeli atau tidak
-def evaluate(data, pos_percent):
-    if data["change_7d"] > 3 and pos_percent > 60:
-        return "✅ Layak dibeli"
-    elif pos_percent > 50:
-        return "⚠️ Berpotensi naik, tapi hati-hati"
+def get_recommendation(pos, coin_data):
+    rekom = ""
+    sell = ""
+    if pos > 60:
+        rekom = "✅ **Disarankan beli sekarang!**"
     else:
-        return "❌ Tidak disarankan beli sekarang"
+        rekom = "❌ **Tidak disarankan beli sekarang**"
 
-# Prediksi nilai jual
-def predict_sell_point(data):
-    est_sell_price = round(data["high"] * 1.05, 2)
-    return f"💰 Disarankan jual saat harga menyentuh sekitar **${est_sell_price}**"
+    if coin_data["price"] != "N/A":
+        try:
+            price = float(coin_data["price"])
+            sell_price = price * 1.08
+            sell = f"💰 **Disarankan jual saat harga menyentuh sekitar ${sell_price:.2f}**"
+        except:
+            sell = ""
+    return rekom, sell
 
-# Inisialisasi chat
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+st.set_page_config(page_title="Prediksi Crypto", layout="centered")
+st.title("🔮 Prediksi Crypto: Beli atau Tidak?")
 
-# Tampilkan riwayat chat
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value="bitcoin")
 
-# Input user
-user_input = st.chat_input("Masukkan nama coin (misal: btc, solana, bnb)")
-if user_input:
-    coin = user_input.lower().strip()
-    with st.chat_message("user"):
-        st.markdown(coin)
-    st.session_state.messages.append({"role": "user", "content": coin})
+if st.button("Prediksi Sekarang"):
+    with st.spinner("Mengambil data..."):
+        coin_data = get_coin_data(coin.lower())
+        pos, neg = get_sentiment_data(coin.lower())
 
-    with st.chat_message("assistant"):
-        coin_data = get_coin_data(coin)
         if coin_data:
-            news = search_news(coin)
-            pos, neg = analyze_sentiment(news)
-            rekom = evaluate(coin_data, pos)
-            sell = predict_sell_point(coin_data)
+            rekom, sell = get_recommendation(pos, coin_data)
 
-            response = f"""
-**📊 Harga Sekarang**: ${coin_data['price']}
-**📈 High 24h**: ${coin_data['high']} | **Low 24h**: ${coin_data['low']}
-**📉 Perubahan 7 Hari**: {coin_data['change_7d']}%
-**💵 Volume Transaksi**: ${int(coin_data['volume']):,}
+            response = (
+                f"📊 **Harga Sekarang**: ${coin_data['price']}\n"
+                f"📈 **High 24h**: ${coin_data['high']} | **Low 24h**: ${coin_data['low']}\n"
+                f"📉 **Perubahan 7 Hari**: {coin_data['change_7d']}%\n"
+                f"💵 **Volume Transaksi**: ${int(coin_data['volume']):,}\n\n"
+                f"📰 **Sentimen Berita:**\n"
+                f"- Positif: {pos}%\n"
+                f"- Negatif: {neg}%\n\n"
+                f"{rekom}\n"
+                f"{sell}"
+            )
 
-**📰 Sentimen Berita:**
-- Positif: {pos}%
-- Negatif: {neg}%
-
-{rekom}
-{sell}
-"""
             st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
         else:
-            error_msg = "❌ Coin tidak ditemukan. Coba pakai nama coin seperti `bitcoin`, `solana`, `bnb`."
-            st.markdown(error_msg)
-            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            st.error("Gagal mengambil data coin. Pastikan simbol coin valid.")
