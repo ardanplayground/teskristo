@@ -44,11 +44,34 @@ def get_recommendation(pos, harga_rp):
         sell = "N/A"
     return rekom, sell
 
+# Ambil semua daftar koin dari CoinGecko
+@st.cache_data(ttl=86400)
+def get_all_coins():
+    url = "https://api.coingecko.com/api/v3/coins/list"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    return []
+
 st.set_page_config(page_title="Prediksi Crypto", layout="centered")
 st.title("🔮 Prediksi Crypto: Beli atau Tidak?")
 
+# Tombol untuk melihat semua koin
+with st.expander("🔍 Lihat Daftar Semua Koin"):
+    all_coins = get_all_coins()
+    search = st.text_input("Cari nama/simbol koin")
+    if search:
+        filtered = [c for c in all_coins if search.lower() in c['id'].lower() or search.lower() in c['symbol'].lower()]
+    else:
+        filtered = all_coins
+
+    for coin in filtered[:100]:  # Biar gak terlalu panjang
+        st.markdown(f"- **{coin['id']}** ({coin['symbol']})")
+
+# Input coin
 coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value="bitcoin")
 
+# Tombol prediksi
 if st.button("Prediksi Sekarang"):
     with st.spinner("Mengambil data..."):
         coin_data = get_coin_data(coin.lower())
@@ -57,6 +80,7 @@ if st.button("Prediksi Sekarang"):
         if coin_data:
             rekom, sell = get_recommendation(pos, coin_data["Harga Sekarang (Rp)"])
 
+            # Format data untuk ditampilkan
             coin_data_display = {}
             for k, v in coin_data.items():
                 if "Rp" in k:
