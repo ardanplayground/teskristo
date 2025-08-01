@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import random
 import pandas as pd
-import math
 
 # Format ke rupiah tanpa koma desimal
 def format_rupiah(val):
@@ -12,6 +11,7 @@ def format_rupiah(val):
     except:
         return "N/A"
 
+# Ambil data coin dari CoinGecko
 def get_coin_data(coin_symbol):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_symbol}"
     response = requests.get(url)
@@ -27,11 +27,13 @@ def get_coin_data(coin_symbol):
         }
     return None
 
+# Sentimen dummy
 def get_sentiment_data(coin_symbol):
     pos = random.randint(0, 100)
     neg = 100 - pos
     return pos, neg
 
+# Rekomendasi berdasarkan sentimen dan harga
 def get_recommendation(pos, harga_rp):
     if isinstance(harga_rp, (int, float)):
         if pos > 60:
@@ -45,22 +47,28 @@ def get_recommendation(pos, harga_rp):
         sell = "N/A"
     return rekom, sell
 
-# Ambil semua daftar koin
-@st.cache_data(ttl=86400)
-def get_all_coins():
-    url = "https://api.coingecko.com/api/v3/coins/list"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    return []
-
-# ================== STREAMLIT APP ================== #
-
+# -------- Streamlit App -------- #
 st.set_page_config(page_title="Prediksi Crypto", layout="centered")
 st.title("🔮 Prediksi Crypto: Beli atau Tidak?")
 
-coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value="bitcoin")
+# Tombol pop-up list koin
+with st.expander("📋 Lihat Daftar Coin Populer"):
+    daftar_koin = [
+        "bitcoin", "ethereum", "binancecoin", "solana", "ripple", "cardano", "dogecoin",
+        "polkadot", "tron", "avalanche", "litecoin", "stellar", "chainlink", "uniswap"
+    ]
+    search = st.text_input("🔎 Cari coin:")
+    hasil_filter = [coin for coin in daftar_koin if search.lower() in coin.lower()]
+    st.write("Klik salah satu coin di bawah untuk mengisi input:")
+    for coin in hasil_filter:
+        if st.button(coin):
+            st.session_state["selected_coin"] = coin
 
+# Text input default
+default_coin = st.session_state.get("selected_coin", "bitcoin")
+coin = st.text_input("Masukkan simbol coin (contoh: bitcoin, binancecoin, solana):", value=default_coin)
+
+# Tombol prediksi
 if st.button("Prediksi Sekarang"):
     with st.spinner("Mengambil data..."):
         coin_data = get_coin_data(coin.lower())
@@ -69,6 +77,7 @@ if st.button("Prediksi Sekarang"):
         if coin_data:
             rekom, sell = get_recommendation(pos, coin_data["Harga Sekarang (Rp)"])
 
+            # Format tampilan tabel
             coin_data_display = {}
             for k, v in coin_data.items():
                 if "Rp" in k:
@@ -95,36 +104,3 @@ if st.button("Prediksi Sekarang"):
                 st.info(sell)
         else:
             st.error("Gagal mengambil data coin. Pastikan simbol coin valid.")
-
-# ================== DAFTAR SEMUA COIN ================== #
-
-st.markdown("---")
-st.subheader("📋 Daftar Semua Coin di CoinGecko")
-
-all_coins = get_all_coins()
-
-# Pencarian coin
-query = st.text_input("Cari coin di daftar semua coin:")
-filtered_coins = [
-    c for c in all_coins
-    if query.lower() in c["id"].lower() or query.lower() in c["symbol"].lower()
-] if query else all_coins
-
-# Pagination
-coins_per_page = 10
-total_items = len(filtered_coins)
-total_pages = max(1, math.ceil(total_items / coins_per_page))
-
-if total_items > 0:
-    page = st.number_input("Halaman", min_value=1, max_value=total_pages, value=1, step=1)
-    start_idx = (page - 1) * coins_per_page
-    end_idx = start_idx + coins_per_page
-    paginated_coins = filtered_coins[start_idx:end_idx]
-
-    # Tampilkan daftar coin
-    for coin in paginated_coins:
-        st.markdown(f"- **{coin['id']}** ({coin['symbol']})")
-
-    st.caption(f"Menampilkan {len(filtered_coins)} coin - Halaman {page} dari {total_pages}")
-else:
-    st.warning("Tidak ada coin yang cocok dengan pencarian kamu.")
