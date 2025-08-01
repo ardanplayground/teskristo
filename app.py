@@ -1,6 +1,15 @@
 import streamlit as st
 import requests
 import random
+import pandas as pd
+
+# Format ke rupiah tanpa koma desimal
+def format_rupiah(val):
+    try:
+        val = float(val)
+        return "Rp {:,.0f}".format(val).replace(",", ".")
+    except:
+        return "N/A"
 
 def get_coin_data(coin_symbol):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_symbol}"
@@ -9,35 +18,30 @@ def get_coin_data(coin_symbol):
         data = response.json()
         market_data = data.get("market_data", {})
         return {
-            "price": market_data.get("current_price", {}).get("usd", "N/A"),
-            "high": market_data.get("high_24h", {}).get("usd", "N/A"),
-            "low": market_data.get("low_24h", {}).get("usd", "N/A"),
-            "change_7d": market_data.get("price_change_percentage_7d", "N/A"),
-            "volume": market_data.get("total_volume", {}).get("usd", "N/A")
+            "Harga Sekarang (Rp)": market_data.get("current_price", {}).get("idr", "N/A"),
+            "High 24 Jam (Rp)": market_data.get("high_24h", {}).get("idr", "N/A"),
+            "Low 24 Jam (Rp)": market_data.get("low_24h", {}).get("idr", "N/A"),
+            "Perubahan 7 Hari (%)": market_data.get("price_change_percentage_7d", "N/A"),
+            "Volume Transaksi (Rp)": market_data.get("total_volume", {}).get("idr", "N/A")
         }
     return None
 
 def get_sentiment_data(coin_symbol):
-    # Dummy sentiment karena API berita tidak tersedia
     pos = random.randint(0, 100)
     neg = 100 - pos
     return pos, neg
 
-def get_recommendation(pos, coin_data):
-    rekom = ""
-    sell = ""
-    if pos > 60:
-        rekom = "✅ **Disarankan beli sekarang!**"
+def get_recommendation(pos, harga_rp):
+    if isinstance(harga_rp, (int, float)):
+        if pos > 60:
+            rekom = f"✅ Disarankan beli sekarang dengan harga {format_rupiah(harga_rp)}"
+        else:
+            rekom = "❌ Tidak disarankan beli saat ini"
+        sell_target = harga_rp * 1.08
+        sell = f"💰 Jual saat harga menyentuh sekitar {format_rupiah(sell_target)}"
     else:
-        rekom = "❌ **Tidak disarankan beli sekarang**"
-
-    if coin_data["price"] != "N/A":
-        try:
-            price = float(coin_data["price"])
-            sell_price = price * 1.08
-            sell = f"💰 **Disarankan jual saat harga menyentuh sekitar ${sell_price:.2f}**"
-        except:
-            sell = ""
+        rekom = "❌ Tidak disarankan beli saat ini"
+        sell = "N/A"
     return rekom, sell
 
 st.set_page_config(page_title="Prediksi Crypto", layout="centered")
@@ -51,20 +55,31 @@ if st.button("Prediksi Sekarang"):
         pos, neg = get_sentiment_data(coin.lower())
 
         if coin_data:
-            rekom, sell = get_recommendation(pos, coin_data)
+            rekom, sell = get_recommendation(pos, coin_data["Harga Sekarang (Rp)"])
 
-            response = (
-                f"📊 **Harga Sekarang**: ${coin_data['price']}\n"
-                f"📈 **High 24h**: ${coin_data['high']} | **Low 24h**: ${coin_data['low']}\n"
-                f"📉 **Perubahan 7 Hari**: {coin_data['change_7d']}%\n"
-                f"💵 **Volume Transaksi**: ${int(coin_data['volume']):,}\n\n"
-                f"📰 **Sentimen Berita:**\n"
-                f"- Positif: {pos}%\n"
-                f"- Negatif: {neg}%\n\n"
-                f"{rekom}\n"
-                f"{sell}"
-            )
+            coin_data_display = {}
+            for k, v in coin_data.items():
+                if "Rp" in k:
+                    coin_data_display[k] = format_rupiah(v)
+                elif "%" in k:
+                    coin_data_display[k] = f"{v:.2f}%" if isinstance(v, (int, float)) else v
+                else:
+                    coin_data_display[k] = v
 
-            st.markdown(response)
+            data_df = pd.DataFrame.from_dict(coin_data_display, orient='index', columns=["Nilai"])
+            st.subheader("📊 Data Pasar")
+            st.table(data_df)
+
+            sentiment_df = pd.DataFrame({
+                "Sentimen": ["Positif", "Negatif"],
+                "Persentase": [f"{pos}%", f"{neg}%"]
+            })
+            st.subheader("📰 Sentimen Berita")
+            st.table(sentiment_df)
+
+            st.subheader("📌 Rekomendasi")
+            st.success(rekom)
+            if sell != "N/A":
+                st.info(sell)
         else:
             st.error("Gagal mengambil data coin. Pastikan simbol coin valid.")
